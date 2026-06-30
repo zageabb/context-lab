@@ -1,5 +1,5 @@
 :root {
-  --panel-width: 360px;
+  --panel-width: minmax(460px, 44vw);
   --border-color: #d9e0e6;
   --surface: #f5f7fa;
   --ink: #102230;
@@ -25,9 +25,13 @@ body {
 
 .layout-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--panel-width);
+  grid-template-columns: minmax(0, 0.95fr) var(--panel-width);
   gap: 1.5rem;
   align-items: start;
+}
+
+.layout-grid > main {
+  min-width: 0;
 }
 
 .app-nav {
@@ -149,6 +153,7 @@ body {
   position: sticky;
   top: 1rem;
   background: rgba(255, 255, 255, 0.93);
+  min-height: calc(100vh - 2rem);
 }
 
 .chat-panel.is-collapsed .card-body {
@@ -156,11 +161,29 @@ body {
 }
 
 .chat-history {
-  min-height: 320px;
-  max-height: 60vh;
+  min-height: 52vh;
+  max-height: 68vh;
   overflow-y: auto;
   background: var(--surface);
-  padding: 1rem;
+  padding: 1.15rem;
+}
+
+.chat-panel .card-header {
+  padding: 1rem 1.1rem;
+}
+
+.chat-panel .card-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-panel .border-top.p-3 {
+  padding: 1rem 1.1rem 1.1rem !important;
+}
+
+#chat-message {
+  min-height: 6rem;
+  resize: vertical;
 }
 
 .chat-message {
@@ -346,6 +369,12 @@ textarea.font-monospace {
 
   .chat-panel {
     position: static;
+    min-height: auto;
+  }
+
+  .chat-history {
+    min-height: 24rem;
+    max-height: 50vh;
   }
 }
 
