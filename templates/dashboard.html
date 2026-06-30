@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Context Lab{% endblock %}
+{% block content %}
+  <section class="hero-card mb-4">
+    <div>
+      <span class="eyebrow">Saved Context Experiments</span>
+      <h1 class="display-title">A cleaner way to test what changes an LLM answer.</h1>
+      <p class="hero-copy">
+        Create persistent environments, upload multiple document sets, edit per-environment instructions, and compare answers with different selected context.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-light btn-lg" href="{{ url_for('environments.create_environment') }}">Create Environment</a>
+        <a class="btn btn-outline-light btn-lg" href="{{ url_for('environments.list_environments') }}">Browse Saved Environments</a>
+      </div>
+    </div>
+    <div class="hero-metric">
+      <span class="hero-metric-label">Processed Documents</span>
+      <strong class="fs-2">{{ processed_count }}</strong>
+      <div class="small text-white-50 mt-1">out of {{ document_count }} uploaded</div>
+    </div>
+  </section>
+
+  <section class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="metric-card p-4 h-100">
+        <div class="text-muted small mb-2">Environments</div>
+        <div class="fs-2 fw-bold">{{ environment_count }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="metric-card p-4 h-100">
+        <div class="text-muted small mb-2">Uploaded Documents</div>
+        <div class="fs-2 fw-bold">{{ document_count }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="metric-card p-4 h-100">
+        <div class="text-muted small mb-2">Retrieval Ready</div>
+        <div class="fs-2 fw-bold">{{ processed_count }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="h4 mb-1">Recent Environments</h2>
+        <p class="text-muted mb-0">Each environment stores its own instructions, documents, and chat history.</p>
+      </div>
+      <a class="btn btn-outline-primary" href="{{ url_for('environments.create_environment') }}">New</a>
+    </div>
+    {% if environments %}
+      <div class="row g-3">
+        {% for environment in environments %}
+          <div class="col-lg-6">
+            <a class="environment-card text-decoration-none d-block" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="small text-uppercase text-muted mb-2">{{ environment.status }}</div>
+                  <h3 class="h5 mb-2 text-dark">{{ environment.name }}</h3>
+                  <p class="text-muted mb-2">{{ environment.description or "No description yet." }}</p>
+                </div>
+                <span class="badge text-bg-light">{{ environment.documents|length }} docs</span>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h3 class="h5">No saved environments yet</h3>
+        <p class="text-muted mb-3">Create one to start storing document sets and instructions for repeatable chat experiments.</p>
+        <a class="btn btn-primary" href="{{ url_for('environments.create_environment') }}">Create the first one</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

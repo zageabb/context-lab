@@ -1,0 +1,32 @@
+<aside class="chat-panel card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div>
+      <div class="fw-semibold">Assistant</div>
+      <div class="small text-muted">Test answer changes as context changes</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-danger" type="button" id="chat-clear-button">Clear</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-chat-toggle>Collapse</button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="chat-context-label px-3 py-2 border-bottom small text-muted">
+      Context: <span data-chat-context-label>{{ (chat_context or {}).get("page", "general") }}</span>
+    </div>
+    <div class="chat-history" id="chat-history">
+      <div class="chat-message assistant">Ask a question, change document selection, then compare how the answer shifts.</div>
+    </div>
+    <div class="border-top p-3">
+      <form id="chat-upload-form" class="mb-3">
+        <label class="form-label small">Quick upload for temporary chat-only context</label>
+        <input class="form-control form-control-sm" type="file" name="file" id="chat-file-input">
+      </form>
+      <form id="chat-form">
+        <div class="mb-2">
+          <textarea class="form-control" id="chat-message" rows="3" placeholder="Ask a question or ask what context you should compare"></textarea>
+        </div>
+        <button class="btn btn-primary w-100" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+</aside>

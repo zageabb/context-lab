@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}New Environment | Context Lab{% endblock %}
+{% block content %}
+  <section class="glass-panel p-4">
+    <div class="mb-4">
+      <h1 class="h2 mb-1">Create Saved Environment</h1>
+      <p class="text-muted mb-0">This becomes a persistent workspace with its own documents, instructions, and chat history.</p>
+    </div>
+    <form method="post" class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Name</label>
+        <input class="form-control" name="name" required placeholder="Example: UK Rail Bid Comparison">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Status</label>
+        <input class="form-control" name="status" value="Draft">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" name="description" rows="3" placeholder="What are you testing in this environment?"></textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" name="notes" rows="5" placeholder="Optional setup notes or experiment goals"></textarea>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Create Environment</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('environments.list_environments') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

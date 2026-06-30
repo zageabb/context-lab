@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Settings | Context Lab{% endblock %}
+{% block content %}
+  <section class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h2 mb-1">Settings</h1>
+        <p class="text-muted mb-0">Global model and chunking defaults for all saved environments.</p>
+      </div>
+      <form method="post" action="{{ url_for('settings.test_ollama') }}">
+        <button class="btn btn-outline-primary" type="submit">Test Ollama</button>
+      </form>
+    </div>
+
+    <form method="post" class="row g-3">
+      {% for key, default in defaults.items() %}
+        <div class="col-12">
+          <label class="form-label fw-semibold">{{ key }}</label>
+          <div class="small text-muted mb-2">{{ default.description }}</div>
+          <input class="form-control" name="{{ key }}" value="{{ settings[key].value if settings.get(key) else default.value }}">
+        </div>
+      {% endfor %}
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">Save Settings</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

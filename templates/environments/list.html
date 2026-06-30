@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Environments | Context Lab{% endblock %}
+{% block content %}
+  <section class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h2 mb-1">Saved Environments</h1>
+      <p class="text-muted mb-0">Persistent test benches for document context, retrieval, and prompt changes.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('environments.create_environment') }}">Create Environment</a>
+  </section>
+
+  <section class="glass-panel p-4">
+    {% if environments %}
+      <div class="row g-3">
+        {% for environment in environments %}
+          <div class="col-lg-6">
+            <a class="environment-card text-decoration-none d-block" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">
+              <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div class="small text-uppercase text-muted mb-2">{{ environment.status }}</div>
+                  <h2 class="h5 mb-2 text-dark">{{ environment.name }}</h2>
+                  <p class="text-muted mb-2">{{ environment.description or "No description yet." }}</p>
+                  <div class="small text-muted">Updated {{ environment.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
+                </div>
+                <span class="badge text-bg-light">{{ environment.documents|length }} docs</span>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h3 class="h5">Nothing saved yet</h3>
+        <p class="text-muted mb-3">Start with one environment, upload a few documents, then compare answers with different document selections.</p>
+        <a class="btn btn-primary" href="{{ url_for('environments.create_environment') }}">Create Environment</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}
