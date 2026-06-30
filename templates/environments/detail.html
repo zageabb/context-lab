@@ -14,52 +14,6 @@
     </div>
   </section>
 
-  <section class="glass-panel p-4 mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <h2 class="h4 mb-1">Environment Details</h2>
-        <p class="text-muted mb-0">Edit the saved metadata and per-environment instruction files here.</p>
-      </div>
-    </div>
-    <form method="post" class="row g-4">
-      <div class="col-md-6">
-        <label class="form-label">Name</label>
-        <input class="form-control" name="name" value="{{ environment.name }}">
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Status</label>
-        <input class="form-control" name="status" value="{{ environment.status }}">
-      </div>
-      <div class="col-12">
-        <label class="form-label">Description</label>
-        <textarea class="form-control" name="description" rows="3">{{ environment.description or "" }}</textarea>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Notes</label>
-        <textarea class="form-control" name="notes" rows="4">{{ environment.notes or "" }}</textarea>
-      </div>
-
-      <div class="col-12">
-        <hr>
-        <div class="mb-3">
-          <h3 class="h5 mb-1">Instruction Files</h3>
-          <p class="text-muted mb-0">These were copied into this environment when it was created, so each saved environment can behave differently.</p>
-        </div>
-        {% for prompt in prompts %}
-          <div class="mb-4">
-            <label class="form-label fw-semibold">{{ prompt.title }}</label>
-            <div class="small text-muted mb-2">{{ prompt.description }}</div>
-            <textarea class="form-control font-monospace" name="prompt__{{ prompt.key }}" rows="10">{{ prompt.content }}</textarea>
-          </div>
-        {% endfor %}
-      </div>
-
-      <div class="col-12">
-        <button class="btn btn-primary" type="submit">Save Environment</button>
-      </div>
-    </form>
-  </section>
-
   <section class="row g-4">
     <div class="col-xl-7">
       <div class="glass-panel p-4 h-100">
@@ -147,5 +101,51 @@
         <div class="fw-semibold">{{ environment.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
       </div>
     </div>
+  </section>
+
+  <section class="glass-panel p-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="h4 mb-1">Environment Details</h2>
+        <p class="text-muted mb-0">Edit the saved metadata and per-environment instruction files after the document setup is in place.</p>
+      </div>
+    </div>
+    <form method="post" class="row g-4">
+      <div class="col-md-6">
+        <label class="form-label">Name</label>
+        <input class="form-control" name="name" value="{{ environment.name }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Status</label>
+        <input class="form-control" name="status" value="{{ environment.status }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" name="description" rows="3">{{ environment.description or "" }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" name="notes" rows="4">{{ environment.notes or "" }}</textarea>
+      </div>
+
+      <div class="col-12">
+        <hr>
+        <div class="mb-3">
+          <h3 class="h5 mb-1">Instruction Files</h3>
+          <p class="text-muted mb-0">These were copied into this environment when it was created, so each saved environment can behave differently.</p>
+        </div>
+        {% for prompt in prompts %}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">{{ prompt.title }}</label>
+            <div class="small text-muted mb-2">{{ prompt.description }}</div>
+            <textarea class="form-control font-monospace" name="prompt__{{ prompt.key }}" rows="10">{{ prompt.content }}</textarea>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">Save Environment</button>
+      </div>
+    </form>
   </section>
 {% endblock %}
