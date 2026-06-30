@@ -4,7 +4,7 @@ import math
 import re
 from collections import Counter
 
-from models import DocumentChunk, EnvironmentDocument
+from models import DocumentChunk, EnvironmentDocument, SharedRAGChunk, SharedRAGDocument
 
 
 def chunk_text(text: str, chunk_size: int = 1400, overlap: int = 250) -> list[str]:
@@ -41,15 +41,30 @@ def refresh_document_chunks(document: EnvironmentDocument, chunk_size: int, over
     return len(chunks)
 
 
+def refresh_shared_rag_chunks(document: SharedRAGDocument, chunk_size: int, overlap: int) -> int:
+    document.chunks.clear()
+    chunks = chunk_text(document.extracted_text or "", chunk_size=chunk_size, overlap=overlap)
+    for index, chunk in enumerate(chunks):
+        document.chunks.append(
+            SharedRAGChunk(
+                chunk_index=index,
+                chunk_text=chunk,
+                token_estimate=max(1, math.ceil(len(chunk) / 4)),
+            )
+        )
+    return len(chunks)
+
+
 def retrieve_relevant_chunks(
-    documents: list[EnvironmentDocument],
+    documents: list,
     query: str,
     top_k: int = 6,
+    source_label: str = "Environment selection",
 ) -> list[dict]:
     query_terms = _terms(query)
     if not query_terms:
         return []
-    scored: list[tuple[float, EnvironmentDocument, DocumentChunk]] = []
+    scored: list[tuple[float, object, object]] = []
     for document in documents:
         for chunk in document.chunks:
             chunk_terms = _terms(chunk.chunk_text)
@@ -63,10 +78,11 @@ def retrieve_relevant_chunks(
         results.append(
             {
                 "document_id": document.id,
-                "document_name": document.original_filename,
+                "document_name": getattr(document, "original_filename", None) or getattr(document, "title", "Untitled document"),
                 "chunk_index": chunk.chunk_index,
                 "score": round(score, 3),
                 "text": chunk.chunk_text,
+                "source_label": source_label,
             }
         )
     return results
@@ -78,7 +94,7 @@ def format_retrieved_context(retrieved_chunks: list[dict]) -> str:
     sections = []
     for chunk in retrieved_chunks:
         sections.append(
-            f"Document: {chunk['document_name']} | Chunk: {chunk['chunk_index']} | Score: {chunk['score']}\n{chunk['text']}"
+            f"Source: {chunk['source_label']} | Document: {chunk['document_name']} | Chunk: {chunk['chunk_index']} | Score: {chunk['score']}\n{chunk['text']}"
         )
     return "\n\n---\n\n".join(sections)
 

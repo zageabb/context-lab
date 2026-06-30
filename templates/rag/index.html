@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Shared RAG | Context Lab{% endblock %}
+{% block content %}
+  <section class="hero-card mb-4">
+    <div>
+      <span class="eyebrow">Shared RAG Library</span>
+      <h1 class="display-title">Common retrieval context across all environments.</h1>
+      <p class="hero-copy">Promoted documents live here so they can influence answers everywhere without needing local checkbox selection.</p>
+    </div>
+    <div class="hero-metric">
+      <span class="hero-metric-label">Shared Docs</span>
+      <strong class="fs-2">{{ shared_documents|length }}</strong>
+      <div class="small text-white-50 mt-1">global library</div>
+    </div>
+  </section>
+
+  <section class="glass-panel p-4 mb-4">
+    <h2 class="h4 mb-1">How It Works</h2>
+    <p class="text-muted mb-0">Environment document selection is now for local context experiments only. Promoting a processed document here makes it part of the shared retrieval baseline across every environment.</p>
+  </section>
+
+  <section class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="h4 mb-1">Shared Documents</h2>
+        <p class="text-muted mb-0">Review what is currently in the shared RAG and remove anything you no longer want globally retrieved.</p>
+      </div>
+    </div>
+    {% if shared_documents %}
+      <div class="document-list">
+        {% for document in shared_documents %}
+          <div class="document-card">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">{{ document.title }}</div>
+                <div class="small text-muted mt-1">
+                  {% if document.source_environment_id %}
+                    Source environment ID: {{ document.source_environment_id }}
+                  {% else %}
+                    Shared source
+                  {% endif %}
+                </div>
+              </div>
+              <span class="badge text-bg-primary">{{ document.chunks|length }} chunks</span>
+            </div>
+            <div class="small text-muted mt-2">{{ document.processing_notes or "No processing notes." }}</div>
+            <div class="action-row mt-3">
+              {% if document.source_document %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('environments.view_processed_document', environment_id=document.source_document.environment_id, document_id=document.source_document.id) }}">View Processed</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('environments.view_environment', environment_id=document.source_document.environment_id) }}">Open Source Environment</a>
+              {% endif %}
+              <form method="post" action="{{ url_for('rag.remove_document', shared_document_id=document.id) }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Remove From Shared RAG</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h3 class="h5">Shared RAG is empty</h3>
+        <p class="text-muted mb-3">After testing a document in an environment, use “Add To Shared RAG” to make it available globally.</p>
+        <a class="btn btn-primary" href="{{ url_for('environments.list_environments') }}">Go To Environments</a>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

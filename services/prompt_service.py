@@ -30,6 +30,7 @@ PROMPT_TEMPLATES = {
             "Environment details:\n{{environment_context}}\n\n"
             "Page context:\n{{page_context}}\n\n"
             "Selected document summaries:\n{{selected_documents_context}}\n\n"
+            "Shared RAG library summary:\n{{shared_rag_context}}\n\n"
             "Retrieved RAG chunks:\n{{retrieved_context}}\n\n"
             "User question:\n{{user_message}}\n"
         ),

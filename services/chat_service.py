@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from models import ChatMessage, ChatSession, ChatUpload, ContextEnvironment, EnvironmentDocument
+from models import ChatMessage, ChatSession, ChatUpload, ContextEnvironment, EnvironmentDocument, SharedRAGDocument
 from services.prompt_service import get_prompt_content, render_template_text
 from services.rag_service import format_retrieved_context, retrieve_relevant_chunks
 
@@ -131,13 +131,14 @@ def build_chat_response(
         }
 
     selected_documents = _selected_documents(environment, selected_document_ids)
+    shared_rag_documents = _shared_rag_documents()
     if intent_hint == "retrieval_advice":
         return {
             "response_type": "answer",
-            "message": _retrieval_advice(environment, selected_documents, message),
+            "message": _retrieval_advice(environment, selected_documents, shared_rag_documents, message),
             "intermediate_steps": [
                 "The intent classifier marked this as a retrieval-advice request.",
-                f"Checked {len(selected_documents)} selected documents for retrieval readiness and likely relevance.",
+                f"Checked {len(selected_documents)} selected documents and {len(shared_rag_documents)} shared RAG documents for likely relevance.",
             ],
         }
 
@@ -152,7 +153,10 @@ def build_chat_response(
         }
 
     selected_context = _serialize_selected_documents(selected_documents)
-    retrieved_chunks = retrieve_relevant_chunks(selected_documents, message, top_k=retrieval_top_k)
+    shared_rag_context = _serialize_shared_rag_library(shared_rag_documents)
+    selected_chunks = retrieve_relevant_chunks(selected_documents, message, top_k=retrieval_top_k, source_label="Environment selection")
+    shared_chunks = retrieve_relevant_chunks(shared_rag_documents, message, top_k=retrieval_top_k, source_label="Shared RAG")
+    retrieved_chunks = sorted(selected_chunks + shared_chunks, key=lambda chunk: chunk["score"], reverse=True)[:retrieval_top_k]
     rag_context = format_retrieved_context(retrieved_chunks)
     system_prompt = get_prompt_content(environment, "chat_system")
     answer_prompt = render_template_text(
@@ -161,6 +165,7 @@ def build_chat_response(
         environment_context=_serialize_environment_context(environment),
         page_context=_serialize_page_context(page_context),
         selected_documents_context=selected_context,
+        shared_rag_context=shared_rag_context,
         retrieved_context=rag_context,
         user_message=message,
     )
@@ -170,6 +175,7 @@ def build_chat_response(
         "message": answer or "The model returned an empty response.",
         "intermediate_steps": [
             f"Selected document count: {len(selected_documents)}",
+            f"Shared RAG document count: {len(shared_rag_documents)}",
             f"Retrieved chunk count: {len(retrieved_chunks)}",
             f"Chat model: {answer_model_name}",
             "Built the final answer prompt from the environment's saved instruction templates.",
@@ -180,9 +186,17 @@ def build_chat_response(
 
 def _selected_documents(environment: ContextEnvironment, selected_document_ids: list[int] | None) -> list[EnvironmentDocument]:
     if not selected_document_ids:
-        return [document for document in environment.documents if document.processed]
+        return []
     selected_ids = {int(document_id) for document_id in selected_document_ids}
     return [document for document in environment.documents if document.id in selected_ids and document.processed]
+
+
+def _shared_rag_documents() -> list[SharedRAGDocument]:
+    return (
+        SharedRAGDocument.query.filter_by(active=True)
+        .order_by(SharedRAGDocument.updated_at.desc())
+        .all()
+    )
 
 
 def _serialize_environment_context(environment: ContextEnvironment) -> str:
@@ -227,9 +241,24 @@ def _serialize_selected_documents(documents: list[EnvironmentDocument], limit: i
     return "\n\n---\n\n".join(sections)
 
 
-def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[EnvironmentDocument], message: str) -> str:
-    if not environment.documents:
-        return "This environment has no documents yet. Upload a few files first so we can compare what happens when context changes."
+def _serialize_shared_rag_library(documents: list[SharedRAGDocument]) -> str:
+    if not documents:
+        return "No shared RAG documents are currently available."
+    lines = [
+        f"- {document.title} ({len(document.chunks)} chunks)"
+        for document in documents[:30]
+    ]
+    return "\n".join(lines)
+
+
+def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[EnvironmentDocument], shared_rag_documents: list[SharedRAGDocument], message: str) -> str:
+    if not environment.documents and not shared_rag_documents:
+        return "There are no environment documents or shared RAG documents yet. Upload a few files first so we can compare what happens when context changes."
+    if not selected_documents and shared_rag_documents:
+        return (
+            f"No environment documents are selected right now, but {len(shared_rag_documents)} shared RAG document(s) are available across all environments. "
+            "Select a focused local subset when you want to compare environment-only context against the shared baseline."
+        )
     if not selected_documents:
         ready_count = sum(1 for document in environment.documents if document.processed)
         if ready_count:
@@ -237,11 +266,11 @@ def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[
                 f"This environment has {ready_count} processed document(s), but none are selected for chat context right now. "
                 "Select one focused subset, ask your question again, then expand the set to compare the answer."
             )
-        return "The uploaded documents are not processed yet, so there is no retrieval-ready context to compare."
+        return "The uploaded documents are not processed yet, so there is no environment-specific context to compare."
     chunk_ready = sum(1 for document in selected_documents if document.rag_ready)
     names = ", ".join(document.original_filename for document in selected_documents[:5])
     return (
         f"For this question, start with the currently selected documents: {names}. "
-        f"{chunk_ready} of {len(selected_documents)} selected document(s) have retrieval chunks ready. "
-        "To test context effects, keep instructions fixed and change one thing at a time: selected docs, document order, or prompt wording."
+        f"{chunk_ready} of {len(selected_documents)} selected document(s) have retrieval chunks ready, and there are {len(shared_rag_documents)} shared RAG document(s) available globally. "
+        "To test context effects, keep instructions fixed and change one thing at a time: selected docs, shared RAG membership, or prompt wording."
     )

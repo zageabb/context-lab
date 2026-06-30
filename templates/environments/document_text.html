@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Processed Document | Context Lab{% endblock %}
+{% block content %}
+<section class="hero-card mb-4">
+  <div>
+    <span class="eyebrow">Document Review</span>
+    <h1 class="display-title">{{ document.original_filename }}</h1>
+    <p class="hero-copy mb-0">Review the processed version of this file before using it in retrieval and chat comparisons.</p>
+  </div>
+</section>
+
+<div class="card glass-panel">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Processed Text</span>
+    <a class="btn btn-outline-secondary" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">Back to Environment</a>
+  </div>
+  <div class="card-body">
+    {% if document.extracted_text %}
+      {% if extracted_text_is_markdown %}
+        <div class="markdown-rendered">{{ extracted_text_html }}</div>
+      {% else %}
+        <pre class="email-preview">{{ document.extracted_text }}</pre>
+      {% endif %}
+    {% else %}
+      <pre class="email-preview">{{ document.processing_notes or "No processed text available." }}</pre>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

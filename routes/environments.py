@@ -9,9 +9,11 @@ from database import db
 from models import ContextEnvironment, EnvironmentDocument, EnvironmentPrompt
 from services.document_extraction import extract_text
 from services.file_storage import ensure_environment_directories, save_environment_upload
+from services.markdown_tools import looks_like_markdown, render_markdown_html
 from services.prompt_service import ensure_environment_prompts, save_prompt_content
 from services.rag_service import refresh_document_chunks
 from services.settings_service import get_setting
+from services.shared_rag_service import sync_shared_rag_document
 
 
 environments_bp = Blueprint("environments", __name__, url_prefix="/environments")
@@ -121,11 +123,12 @@ def upload_document(environment_id: int):
         existing.rag_ready = False
         document = existing
 
+    chunk_size = int(get_setting("retrieval_chunk_size", "1400") or "1400")
+    chunk_overlap = int(get_setting("retrieval_chunk_overlap", "250") or "250")
     if text:
-        chunk_size = int(get_setting("retrieval_chunk_size", "1400") or "1400")
-        chunk_overlap = int(get_setting("retrieval_chunk_overlap", "250") or "250")
         chunk_count = refresh_document_chunks(document, chunk_size=chunk_size, overlap=chunk_overlap)
         document.rag_ready = chunk_count > 0
+    sync_shared_rag_document(document, chunk_size=chunk_size, overlap=chunk_overlap)
     db.session.commit()
     if text:
         flash(f"Uploaded and processed {original_name}.", "success")
@@ -144,13 +147,30 @@ def reprocess_document(environment_id: int, document_id: int):
     document.processing_notes = error or "Reprocessed manually."
     document.chunks.clear()
     document.rag_ready = False
+    chunk_size = int(get_setting("retrieval_chunk_size", "1400") or "1400")
+    chunk_overlap = int(get_setting("retrieval_chunk_overlap", "250") or "250")
     if text:
-        chunk_size = int(get_setting("retrieval_chunk_size", "1400") or "1400")
-        chunk_overlap = int(get_setting("retrieval_chunk_overlap", "250") or "250")
         refresh_document_chunks(document, chunk_size=chunk_size, overlap=chunk_overlap)
+    sync_shared_rag_document(document, chunk_size=chunk_size, overlap=chunk_overlap)
     db.session.commit()
     flash("Document reprocessed.", "success" if text else "warning")
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+
+@environments_bp.route("/<int:environment_id>/documents/<int:document_id>/processed")
+def view_processed_document(environment_id: int, document_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    document = EnvironmentDocument.query.filter_by(environment_id=environment.id, id=document_id).first_or_404()
+    extracted_text = document.extracted_text or ""
+    is_markdown = looks_like_markdown(extracted_text)
+    return render_template(
+        "environments/document_text.html",
+        environment=environment,
+        document=document,
+        extracted_text_html=render_markdown_html(extracted_text) if is_markdown else None,
+        extracted_text_is_markdown=is_markdown,
+        chat_context={"page": "environment_document_text", "environment_id": environment.id},
+    )
 
 
 def _unique_slug(name: str) -> str:

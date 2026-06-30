@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, render_template
 
-from models import ContextEnvironment, EnvironmentDocument
+from models import ContextEnvironment, EnvironmentDocument, SharedRAGDocument
 
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -14,11 +14,13 @@ def index():
     environment_count = ContextEnvironment.query.count()
     document_count = EnvironmentDocument.query.count()
     processed_count = EnvironmentDocument.query.filter_by(processed=True).count()
+    shared_rag_count = SharedRAGDocument.query.filter_by(active=True).count()
     return render_template(
         "dashboard.html",
         environments=environments,
         environment_count=environment_count,
         document_count=document_count,
         processed_count=processed_count,
+        shared_rag_count=shared_rag_count,
         chat_context={"page": "dashboard"},
     )

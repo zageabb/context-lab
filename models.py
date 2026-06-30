@@ -43,6 +43,7 @@ class EnvironmentDocument(TimestampMixin, db.Model):
 
     environment = db.relationship("ContextEnvironment", back_populates="documents")
     chunks = db.relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    shared_rag_document = db.relationship("SharedRAGDocument", back_populates="source_document", uselist=False)
 
 
 class DocumentChunk(db.Model):
@@ -53,6 +54,32 @@ class DocumentChunk(db.Model):
     token_estimate = db.Column(db.Integer, nullable=False, default=0)
 
     document = db.relationship("EnvironmentDocument", back_populates="chunks")
+
+
+class SharedRAGDocument(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    source_type = db.Column(db.String(100), nullable=False, default="environment_document")
+    original_filename = db.Column(db.String(255))
+    file_type = db.Column(db.String(50))
+    extracted_text = db.Column(db.Text)
+    processing_notes = db.Column(db.Text)
+    source_environment_id = db.Column(db.Integer, db.ForeignKey("context_environment.id"))
+    source_environment_document_id = db.Column(db.Integer, db.ForeignKey("environment_document.id"), unique=True)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+
+    source_document = db.relationship("EnvironmentDocument", back_populates="shared_rag_document")
+    chunks = db.relationship("SharedRAGChunk", back_populates="shared_rag_document", cascade="all, delete-orphan")
+
+
+class SharedRAGChunk(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    shared_rag_document_id = db.Column(db.Integer, db.ForeignKey("shared_rag_document.id"), nullable=False)
+    chunk_index = db.Column(db.Integer, nullable=False)
+    chunk_text = db.Column(db.Text, nullable=False)
+    token_estimate = db.Column(db.Integer, nullable=False, default=0)
+
+    shared_rag_document = db.relationship("SharedRAGDocument", back_populates="chunks")
 
 
 class EnvironmentPrompt(TimestampMixin, db.Model):

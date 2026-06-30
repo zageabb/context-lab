@@ -8,4 +8,5 @@ __pycache__/
 venv/
 
 context_lab.db
+context_lab.db-journal
 data/

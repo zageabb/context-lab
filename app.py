@@ -9,6 +9,7 @@ from database import db
 from routes.chat import chat_bp
 from routes.dashboard import dashboard_bp
 from routes.environments import environments_bp
+from routes.rag import rag_bp
 from routes.settings import settings_bp
 from services.settings_service import ensure_default_settings
 
@@ -28,6 +29,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(environments_bp)
+    app.register_blueprint(rag_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(chat_bp)
     return app
