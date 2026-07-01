@@ -27,10 +27,24 @@ function appendMessage(role, text, steps = []) {
   body.innerHTML = renderMarkdown(text);
   node.appendChild(body);
   if (steps.length) {
-    const detail = document.createElement("div");
-    detail.className = "chat-steps";
-    detail.innerHTML = renderMarkdown(steps.map((step) => `- ${step}`).join("\n"));
-    node.appendChild(detail);
+    if (role === "assistant") {
+      const thinking = document.createElement("details");
+      thinking.className = "chat-thinking";
+      thinking.open = true;
+      const summary = document.createElement("summary");
+      summary.textContent = "Thinking";
+      thinking.appendChild(summary);
+      const detail = document.createElement("div");
+      detail.className = "chat-steps";
+      detail.innerHTML = renderMarkdown(steps.map((step) => `- ${step}`).join("\n"));
+      thinking.appendChild(detail);
+      node.appendChild(thinking);
+    } else {
+      const detail = document.createElement("div");
+      detail.className = "chat-steps";
+      detail.innerHTML = renderMarkdown(steps.map((step) => `- ${step}`).join("\n"));
+      node.appendChild(detail);
+    }
   }
   chatHistory.appendChild(node);
   chatHistory.scrollTop = chatHistory.scrollHeight;

@@ -201,9 +201,41 @@ body {
   background: #fff6e7;
 }
 
+.chat-message.assistant {
+  border: 1px solid rgba(17, 58, 82, 0.1);
+}
+
 .chat-message-body > :last-child,
 .chat-steps > :last-child {
   margin-bottom: 0;
+}
+
+.chat-thinking {
+  margin-top: 0.85rem;
+  border-top: 1px dashed rgba(16, 34, 48, 0.14);
+  padding-top: 0.85rem;
+}
+
+.chat-thinking summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  list-style: none;
+}
+
+.chat-thinking summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-thinking summary::after {
+  content: "Show/Hide";
+  float: right;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .chat-message-body p,

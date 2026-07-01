@@ -133,7 +133,7 @@ def build_chat_response(
     selected_documents = _selected_documents(environment, selected_document_ids)
     shared_rag_documents = _shared_rag_documents()
     if intent_hint == "retrieval_advice":
-        return {
+        response_payload = {
             "response_type": "answer",
             "message": _retrieval_advice(environment, selected_documents, shared_rag_documents, message),
             "intermediate_steps": [
@@ -141,9 +141,16 @@ def build_chat_response(
                 f"Checked {len(selected_documents)} selected documents and {len(shared_rag_documents)} shared RAG documents for likely relevance.",
             ],
         }
+        response_payload["intermediate_steps"] = _finalize_thinking_steps(
+            response_payload["intermediate_steps"],
+            selected_documents=selected_documents,
+            shared_rag_documents=shared_rag_documents,
+            retrieved_chunks=[],
+        )
+        return response_payload
 
     if answer_client is None or not answer_model_name:
-        return {
+        response_payload = {
             "response_type": "answer",
             "message": "The chat model is not configured, so I can only report that the selected documents are ready for retrieval testing.",
             "intermediate_steps": [
@@ -151,6 +158,13 @@ def build_chat_response(
                 "LLM answer generation was unavailable, so no model call was made.",
             ],
         }
+        response_payload["intermediate_steps"] = _finalize_thinking_steps(
+            response_payload["intermediate_steps"],
+            selected_documents=selected_documents,
+            shared_rag_documents=shared_rag_documents,
+            retrieved_chunks=[],
+        )
+        return response_payload
 
     selected_context = _serialize_selected_documents(selected_documents)
     shared_rag_context = _serialize_shared_rag_library(shared_rag_documents)
@@ -170,7 +184,7 @@ def build_chat_response(
         user_message=message,
     )
     answer = answer_client.generate_text(answer_model_name, answer_prompt)
-    return {
+    response_payload = {
         "response_type": "answer",
         "message": answer or "The model returned an empty response.",
         "intermediate_steps": [
@@ -182,6 +196,13 @@ def build_chat_response(
         ],
         "retrieved_chunks": retrieved_chunks,
     }
+    response_payload["intermediate_steps"] = _finalize_thinking_steps(
+        response_payload["intermediate_steps"],
+        selected_documents=selected_documents,
+        shared_rag_documents=shared_rag_documents,
+        retrieved_chunks=retrieved_chunks,
+    )
+    return response_payload
 
 
 def _selected_documents(environment: ContextEnvironment, selected_document_ids: list[int] | None) -> list[EnvironmentDocument]:
@@ -274,3 +295,26 @@ def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[
         f"{chunk_ready} of {len(selected_documents)} selected document(s) have retrieval chunks ready, and there are {len(shared_rag_documents)} shared RAG document(s) available globally. "
         "To test context effects, keep instructions fixed and change one thing at a time: selected docs, shared RAG membership, or prompt wording."
     )
+
+
+def _finalize_thinking_steps(
+    steps: list[str],
+    selected_documents: list[EnvironmentDocument],
+    shared_rag_documents: list[SharedRAGDocument],
+    retrieved_chunks: list[dict],
+) -> list[str]:
+    thinking_steps = [
+        "Visible reasoning trace only: this shows orchestration and evidence used, not the model's hidden chain-of-thought.",
+        f"Local selected documents: {', '.join(document.original_filename for document in selected_documents[:6]) or 'none'}",
+        f"Shared RAG available: {len(shared_rag_documents)} document(s)",
+        *steps,
+    ]
+    if retrieved_chunks:
+        thinking_steps.append("Evidence retrieved for this answer:")
+        for chunk in retrieved_chunks[:6]:
+            thinking_steps.append(
+                f"{chunk['source_label']} -> {chunk['document_name']} (chunk {chunk['chunk_index']}, score {chunk['score']})"
+            )
+    else:
+        thinking_steps.append("No high-scoring retrieval chunks were attached to this answer.")
+    return thinking_steps
