@@ -14,17 +14,23 @@
       <div class="row g-3">
         {% for environment in environments %}
           <div class="col-lg-6">
-            <a class="environment-card text-decoration-none d-block" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">
+            <div class="environment-card">
               <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                   <div class="small text-uppercase text-muted mb-2">{{ environment.status }}</div>
-                  <h2 class="h5 mb-2 text-dark">{{ environment.name }}</h2>
+                  <h2 class="h5 mb-2"><a class="text-dark text-decoration-none" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">{{ environment.name }}</a></h2>
                   <p class="text-muted mb-2">{{ environment.description or "No description yet." }}</p>
                   <div class="small text-muted">Updated {{ environment.updated_at.strftime("%Y-%m-%d %H:%M") }}</div>
                 </div>
                 <span class="badge text-bg-light">{{ environment.documents|length }} docs</span>
               </div>
-            </a>
+              <div class="action-row mt-3">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">Open</a>
+                <form method="post" action="{{ url_for('environments.delete_environment', environment_id=environment.id) }}" onsubmit="return window.confirm('Delete this environment and all its uploaded documents?');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
+              </div>
+            </div>
           </div>
         {% endfor %}
       </div>

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
 from database import db
-from models import ContextEnvironment, EnvironmentDocument, EnvironmentPrompt
+from models import ContextEnvironment, EnvironmentDocument, EnvironmentPrompt, SharedRAGDocument
 from services.document_extraction import extract_text
-from services.file_storage import ensure_environment_directories, save_environment_upload
+from services.file_storage import ensure_environment_directories, environment_dir, save_environment_upload
 from services.markdown_tools import looks_like_markdown, render_markdown_html
 from services.prompt_service import ensure_environment_prompts, save_prompt_content
 from services.rag_service import refresh_document_chunks
@@ -137,6 +138,26 @@ def upload_document(environment_id: int):
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
 
 
+@environments_bp.route("/<int:environment_id>/delete", methods=["POST"])
+def delete_environment(environment_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    name = environment.name
+    base_dir = environment_dir(current_app.config["DATA_DIR"], environment.id)
+
+    shared_documents = SharedRAGDocument.query.filter_by(source_environment_id=environment.id).all()
+    for shared_document in shared_documents:
+        db.session.delete(shared_document)
+
+    db.session.delete(environment)
+    db.session.commit()
+
+    if base_dir.exists():
+        shutil.rmtree(base_dir, ignore_errors=True)
+
+    flash(f"Deleted environment: {name}.", "success")
+    return redirect(url_for("environments.list_environments"))
+
+
 @environments_bp.route("/<int:environment_id>/documents/<int:document_id>/reprocess", methods=["POST"])
 def reprocess_document(environment_id: int, document_id: int):
     environment = ContextEnvironment.query.get_or_404(environment_id)
@@ -154,6 +175,30 @@ def reprocess_document(environment_id: int, document_id: int):
     sync_shared_rag_document(document, chunk_size=chunk_size, overlap=chunk_overlap)
     db.session.commit()
     flash("Document reprocessed.", "success" if text else "warning")
+    return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+
+@environments_bp.route("/<int:environment_id>/documents/<int:document_id>/delete", methods=["POST"])
+def delete_document(environment_id: int, document_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    document = EnvironmentDocument.query.filter_by(environment_id=environment.id, id=document_id).first_or_404()
+    filename = document.original_filename
+
+    shared_document = document.shared_rag_document
+    if shared_document is not None:
+        db.session.delete(shared_document)
+
+    for path_value in (document.file_path, document.extracted_text_path):
+        path = Path(path_value or "")
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+    db.session.delete(document)
+    db.session.commit()
+    flash(f"Deleted document: {filename}.", "success")
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
 
 

@@ -14,6 +14,12 @@
     </div>
   </section>
 
+  <div class="action-row mb-4">
+    <form method="post" action="{{ url_for('environments.delete_environment', environment_id=environment.id) }}" onsubmit="return window.confirm('Delete this environment and all its uploaded documents?');">
+      <button class="btn btn-outline-danger" type="submit">Delete Environment</button>
+    </form>
+  </div>
+
   <section class="row g-4">
     <div class="col-xl-7">
       <div class="glass-panel p-4 h-100">
@@ -67,6 +73,9 @@
                   {% endif %}
                   <form method="post" action="{{ url_for('environments.reprocess_document', environment_id=environment.id, document_id=document.id) }}">
                     <button class="btn btn-sm btn-outline-secondary" type="submit">Reprocess</button>
+                  </form>
+                  <form method="post" action="{{ url_for('environments.delete_document', environment_id=environment.id, document_id=document.id) }}" onsubmit="return window.confirm('Delete this uploaded document?');">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete Document</button>
                   </form>
                 </div>
               </div>
