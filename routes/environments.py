@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -27,7 +28,12 @@ from services.prompt_service import ensure_environment_prompts, save_prompt_cont
 from services.rag_service import refresh_document_chunks
 from services.settings_service import get_setting
 from services.shared_rag_service import sync_shared_rag_document
-from services.structured_data_service import delete_structured_tables, import_structured_file_to_sqlite, preview_structured_table
+from services.structured_data_service import (
+    delete_structured_tables,
+    execute_read_only_sql,
+    import_structured_file_to_sqlite,
+    preview_structured_table,
+)
 
 
 environments_bp = Blueprint("environments", __name__, url_prefix="/environments")
@@ -307,6 +313,45 @@ def view_structured_data_table(environment_id: int, table_id: int):
         preview_columns=preview["columns"],
         preview_rows=preview["rows"],
         chat_context={"page": "environment_structured_table", "environment_id": environment.id},
+    )
+
+
+@environments_bp.route("/<int:environment_id>/structured-data/sql", methods=["GET", "POST"])
+def structured_data_sql_playground(environment_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    tables = (
+        StructuredDataTable.query.join(StructuredDataSource)
+        .filter(StructuredDataSource.environment_id == environment.id)
+        .order_by(StructuredDataTable.display_name.asc())
+        .all()
+    )
+    table_summaries = [
+        {
+            "display_name": table.display_name,
+            "sqlite_table_name": table.sqlite_table_name,
+            "row_count": table.row_count,
+            "columns": json.loads(table.column_names_json or "[]"),
+        }
+        for table in tables
+    ]
+
+    sql_query = request.form.get("sql_query", "").strip() if request.method == "POST" else ""
+    result = None
+    sql_error = None
+    if request.method == "POST":
+        try:
+            result = execute_read_only_sql(current_app.config["DATA_DIR"], environment.id, sql_query)
+        except Exception as exc:
+            sql_error = str(exc)
+
+    return render_template(
+        "environments/sql_playground.html",
+        environment=environment,
+        sql_query=sql_query,
+        result=result,
+        sql_error=sql_error,
+        tables=table_summaries,
+        chat_context={"page": "environment_sql_playground", "environment_id": environment.id},
     )
 
 

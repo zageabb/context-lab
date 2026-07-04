@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}SQL Playground | {{ environment.name }} | Context Lab{% endblock %}
+{% block content %}
+  <section class="hero-card mb-4">
+    <div>
+      <span class="eyebrow">Structured Data</span>
+      <h1 class="display-title">SQL Playground</h1>
+      <p class="hero-copy">Paste a read-only SQL query to test model-generated statements directly against this environment's imported structured data.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="btn btn-light" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">Back To Environment</a>
+    </div>
+  </section>
+
+  <section class="row g-4">
+    <div class="col-xl-8">
+      <div class="glass-panel p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h2 class="h4 mb-1">Run Query</h2>
+            <p class="text-muted mb-0">The playground allows single `SELECT` or `WITH` statements only.</p>
+          </div>
+        </div>
+        <form method="post">
+          <label class="form-label fw-semibold" for="sql-query">SQL</label>
+          <textarea class="form-control font-monospace sql-playground-input" id="sql-query" name="sql_query" rows="12" placeholder="SELECT * FROM your_table LIMIT 25;">{{ sql_query }}</textarea>
+          <div class="action-row mt-3">
+            <button class="btn btn-primary" type="submit">Run SQL</button>
+          </div>
+        </form>
+
+        {% if sql_error %}
+          <div class="alert alert-warning mt-4 mb-0">{{ sql_error }}</div>
+        {% endif %}
+
+        {% if result %}
+          <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h3 class="h5 mb-1">Results</h3>
+                <p class="text-muted mb-0">{{ result.row_count }} row{{ "" if result.row_count == 1 else "s" }} returned.</p>
+              </div>
+            </div>
+            {% if result.columns %}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle structured-table-preview">
+                  <thead>
+                    <tr>
+                      {% for column in result.columns %}
+                        <th>{{ column }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in result.rows %}
+                      <tr>
+                        {% for value in row %}
+                          <td>{{ value }}</td>
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="empty-state">
+                <h3 class="h5">No tabular result</h3>
+                <p class="text-muted mb-0">The query ran, but SQLite did not return visible columns.</p>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-xl-4">
+      <div class="metric-card p-4 mb-4">
+        <h2 class="h5 mb-3">Available Tables</h2>
+        {% if tables %}
+          <div class="sql-table-list">
+            {% for table in tables %}
+              <div class="sql-table-card">
+                <div class="fw-semibold">{{ table.sqlite_table_name }}</div>
+                <div class="small text-muted mb-2">{{ table.display_name }} · {{ table.row_count }} rows</div>
+                <div class="small text-muted">{{ table.columns|join(", ") }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">No structured data has been imported yet.</p>
+        {% endif %}
+      </div>
+      <div class="metric-card p-4">
+        <h2 class="h5 mb-3">Try These</h2>
+        <div class="small text-muted">Example patterns you can adapt:</div>
+        <pre class="mt-3 mb-0"><code>SELECT * FROM your_table LIMIT 25
+
+SELECT column_a, column_b
+FROM your_table
+WHERE lower(column_a) LIKE '%keyword%'
+ORDER BY column_b DESC
+LIMIT 50</code></pre>
+      </div>
+    </div>
+  </section>
+{% endblock %}

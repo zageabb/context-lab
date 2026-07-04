@@ -118,6 +118,7 @@
         <h2 class="h4 mb-1">Structured Data</h2>
         <p class="text-muted mb-0">Import CSV or XLSX files into an environment-local SQLite store so the chat can use tabular data as structured context.</p>
       </div>
+      <a class="btn btn-outline-primary" href="{{ url_for('environments.structured_data_sql_playground', environment_id=environment.id) }}">Open SQL Playground</a>
     </div>
     <form method="post" action="{{ url_for('environments.upload_structured_data', environment_id=environment.id) }}" enctype="multipart/form-data" class="upload-bar mb-4">
       <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required>

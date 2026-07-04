@@ -66,6 +66,29 @@ def preview_structured_table(base_data_dir: Path, environment_id: int, table: St
     return {"columns": columns, "rows": rows}
 
 
+def execute_read_only_sql(base_data_dir: Path, environment_id: int, sql: str, row_limit: int = 200) -> dict:
+    query = (sql or "").strip()
+    if not query:
+        raise ValueError("Enter a SQL query to run.")
+    if not _is_read_only_sql(query):
+        raise ValueError("Only single read-only SELECT or WITH queries are allowed in the playground.")
+
+    db_path = structured_db_path(base_data_dir, environment_id)
+    if not db_path.exists():
+        return {"columns": [], "rows": [], "row_count": 0}
+
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        cursor = connection.execute(query)
+        rows = cursor.fetchmany(max(1, min(row_limit, 1000)))
+        columns = [column[0] for column in (cursor.description or [])]
+    return {
+        "columns": columns,
+        "rows": [list(row) for row in rows],
+        "row_count": len(rows),
+    }
+
+
 def summarize_structured_tables(tables: list[StructuredDataTable]) -> str:
     if not tables:
         return "No structured data tables are available for this environment."
@@ -210,3 +233,30 @@ def _pad_row(row: list[str], width: int) -> list[str]:
 
 def _query_terms(query: str) -> list[str]:
     return [term for term in re.findall(r"[a-zA-Z0-9]{3,}", (query or "").lower())[:12]]
+
+
+def _is_read_only_sql(query: str) -> bool:
+    stripped = query.strip().rstrip(";").strip()
+    if not stripped:
+        return False
+    if ";" in stripped:
+        return False
+    normalized = stripped.lower()
+    if not (normalized.startswith("select") or normalized.startswith("with")):
+        return False
+    blocked_terms = (
+        "insert",
+        "update",
+        "delete",
+        "drop",
+        "alter",
+        "create",
+        "replace",
+        "attach",
+        "detach",
+        "pragma",
+        "vacuum",
+        "reindex",
+        "truncate",
+    )
+    return not any(re.search(rf"\b{term}\b", normalized) for term in blocked_terms)
