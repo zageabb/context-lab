@@ -22,6 +22,16 @@ from services.structured_data_service import (
 )
 
 MAX_SELECTED_DOCUMENT_CONTEXT_CHARS = 18000
+BASE_CHAT_GROUNDING_INSTRUCTIONS = (
+    "Base grounding rules for this answer:\n"
+    "- Use the supplied environment details, selected documents, shared RAG context, structured data summaries, "
+    "structured row matches, and retrieved chunks as valid evidence sources.\n"
+    "- Treat structured data as first-class context, especially for numeric, tabular, status, schedule, and comparison questions.\n"
+    "- If documents and structured data conflict, call out the conflict explicitly instead of silently choosing one.\n"
+    "- Prefer structured data for exact values and documents for explanatory narrative or policy wording.\n"
+    "- Be explicit about which evidence source supports the answer.\n"
+    "- Do not invent facts or claim certainty beyond the provided context.\n"
+)
 
 
 def get_or_create_session(db, environment_id: int | None, page_context: dict | None) -> ChatSession:
@@ -201,7 +211,7 @@ def build_chat_response(
     retrieved_chunks = sorted(selected_chunks + shared_chunks, key=lambda chunk: chunk["score"], reverse=True)[:retrieval_top_k]
     rag_context = format_retrieved_context(retrieved_chunks)
     structured_row_context = format_structured_row_context(structured_rows)
-    system_prompt = get_prompt_content(environment, "chat_system")
+    system_prompt = f"{BASE_CHAT_GROUNDING_INSTRUCTIONS}\n{get_prompt_content(environment, 'chat_system').strip()}"
     answer_prompt = render_template_text(
         get_prompt_content(environment, "chat_answer"),
         system_prompt=system_prompt,

@@ -120,11 +120,15 @@ def retrieve_structured_rows(
     with sqlite3.connect(db_path) as connection:
         for table in tables:
             columns = json.loads(table.column_names_json or "[]")
+            table_terms = _query_terms(f"{table.display_name} {' '.join(columns)}")
             cursor = connection.execute(f'SELECT * FROM "{table.sqlite_table_name}" LIMIT 200')
             for row in cursor.fetchall():
                 row_values = ["" if value is None else str(value) for value in row]
                 combined = " | ".join(row_values).lower()
-                score = sum(1 for term in query_terms if term in combined)
+                row_terms = _query_terms(combined)
+                value_hits = sum(1 for term in query_terms if term in combined)
+                metadata_hits = sum(1 for term in query_terms if term in table_terms)
+                score = value_hits + (metadata_hits * 1.5)
                 if score <= 0:
                     continue
                 matches.append(
@@ -133,6 +137,10 @@ def retrieve_structured_rows(
                         "score": score,
                         "columns": columns,
                         "row_values": row_values,
+                        "matched_on": {
+                            "value_terms": [term for term in query_terms if term in row_terms],
+                            "metadata_terms": [term for term in query_terms if term in table_terms],
+                        },
                     }
                 )
     matches.sort(key=lambda item: item["score"], reverse=True)
