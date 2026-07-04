@@ -2,9 +2,24 @@ from __future__ import annotations
 
 import json
 
-from models import ChatMessage, ChatSession, ChatUpload, ContextEnvironment, EnvironmentDocument, SharedRAGDocument
+from flask import current_app
+
+from models import (
+    ChatMessage,
+    ChatSession,
+    ChatUpload,
+    ContextEnvironment,
+    EnvironmentDocument,
+    SharedRAGDocument,
+    StructuredDataTable,
+)
 from services.prompt_service import get_prompt_content, render_template_text
 from services.rag_service import format_retrieved_context, retrieve_relevant_chunks
+from services.structured_data_service import (
+    format_structured_row_context,
+    retrieve_structured_rows,
+    summarize_structured_tables,
+)
 
 MAX_SELECTED_DOCUMENT_CONTEXT_CHARS = 18000
 
@@ -132,10 +147,11 @@ def build_chat_response(
 
     selected_documents = _selected_documents(environment, selected_document_ids)
     shared_rag_documents = _shared_rag_documents()
+    structured_tables = _structured_tables(environment)
     if intent_hint == "retrieval_advice":
         response_payload = {
             "response_type": "answer",
-            "message": _retrieval_advice(environment, selected_documents, shared_rag_documents, message),
+            "message": _retrieval_advice(environment, selected_documents, shared_rag_documents, structured_tables, message),
             "intermediate_steps": [
                 "The intent classifier marked this as a retrieval-advice request.",
                 f"Checked {len(selected_documents)} selected documents and {len(shared_rag_documents)} shared RAG documents for likely relevance.",
@@ -146,6 +162,8 @@ def build_chat_response(
             selected_documents=selected_documents,
             shared_rag_documents=shared_rag_documents,
             retrieved_chunks=[],
+            structured_tables=structured_tables,
+            structured_rows=[],
         )
         return response_payload
 
@@ -163,15 +181,26 @@ def build_chat_response(
             selected_documents=selected_documents,
             shared_rag_documents=shared_rag_documents,
             retrieved_chunks=[],
+            structured_tables=structured_tables,
+            structured_rows=[],
         )
         return response_payload
 
     selected_context = _serialize_selected_documents(selected_documents)
     shared_rag_context = _serialize_shared_rag_library(shared_rag_documents)
+    structured_data_context = summarize_structured_tables(structured_tables)
     selected_chunks = retrieve_relevant_chunks(selected_documents, message, top_k=retrieval_top_k, source_label="Environment selection")
     shared_chunks = retrieve_relevant_chunks(shared_rag_documents, message, top_k=retrieval_top_k, source_label="Shared RAG")
+    structured_rows = retrieve_structured_rows(
+        current_app.config["DATA_DIR"],
+        environment.id,
+        structured_tables,
+        message,
+        row_limit=retrieval_top_k,
+    )
     retrieved_chunks = sorted(selected_chunks + shared_chunks, key=lambda chunk: chunk["score"], reverse=True)[:retrieval_top_k]
     rag_context = format_retrieved_context(retrieved_chunks)
+    structured_row_context = format_structured_row_context(structured_rows)
     system_prompt = get_prompt_content(environment, "chat_system")
     answer_prompt = render_template_text(
         get_prompt_content(environment, "chat_answer"),
@@ -180,6 +209,8 @@ def build_chat_response(
         page_context=_serialize_page_context(page_context),
         selected_documents_context=selected_context,
         shared_rag_context=shared_rag_context,
+        structured_data_context=structured_data_context,
+        structured_row_context=structured_row_context,
         retrieved_context=rag_context,
         user_message=message,
     )
@@ -201,6 +232,8 @@ def build_chat_response(
         selected_documents=selected_documents,
         shared_rag_documents=shared_rag_documents,
         retrieved_chunks=retrieved_chunks,
+        structured_tables=structured_tables,
+        structured_rows=structured_rows,
     )
     return response_payload
 
@@ -218,6 +251,13 @@ def _shared_rag_documents() -> list[SharedRAGDocument]:
         .order_by(SharedRAGDocument.updated_at.desc())
         .all()
     )
+
+
+def _structured_tables(environment: ContextEnvironment) -> list[StructuredDataTable]:
+    tables: list[StructuredDataTable] = []
+    for source in environment.structured_data_sources:
+        tables.extend(source.tables)
+    return sorted(tables, key=lambda table: table.updated_at, reverse=True)
 
 
 def _serialize_environment_context(environment: ContextEnvironment) -> str:
@@ -272,9 +312,15 @@ def _serialize_shared_rag_library(documents: list[SharedRAGDocument]) -> str:
     return "\n".join(lines)
 
 
-def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[EnvironmentDocument], shared_rag_documents: list[SharedRAGDocument], message: str) -> str:
-    if not environment.documents and not shared_rag_documents:
-        return "There are no environment documents or shared RAG documents yet. Upload a few files first so we can compare what happens when context changes."
+def _retrieval_advice(
+    environment: ContextEnvironment,
+    selected_documents: list[EnvironmentDocument],
+    shared_rag_documents: list[SharedRAGDocument],
+    structured_tables: list[StructuredDataTable],
+    message: str,
+) -> str:
+    if not environment.documents and not shared_rag_documents and not structured_tables:
+        return "There are no environment documents, structured data tables, or shared RAG documents yet. Upload a few files first so we can compare what happens when context changes."
     if not selected_documents and shared_rag_documents:
         return (
             f"No environment documents are selected right now, but {len(shared_rag_documents)} shared RAG document(s) are available across all environments. "
@@ -292,8 +338,8 @@ def _retrieval_advice(environment: ContextEnvironment, selected_documents: list[
     names = ", ".join(document.original_filename for document in selected_documents[:5])
     return (
         f"For this question, start with the currently selected documents: {names}. "
-        f"{chunk_ready} of {len(selected_documents)} selected document(s) have retrieval chunks ready, and there are {len(shared_rag_documents)} shared RAG document(s) available globally. "
-        "To test context effects, keep instructions fixed and change one thing at a time: selected docs, shared RAG membership, or prompt wording."
+        f"{chunk_ready} of {len(selected_documents)} selected document(s) have retrieval chunks ready, there are {len(shared_rag_documents)} shared RAG document(s) available globally, and {len(structured_tables)} structured table(s) available locally. "
+        "To test context effects, keep instructions fixed and change one thing at a time: selected docs, structured-data imports, shared RAG membership, or prompt wording."
     )
 
 
@@ -302,11 +348,14 @@ def _finalize_thinking_steps(
     selected_documents: list[EnvironmentDocument],
     shared_rag_documents: list[SharedRAGDocument],
     retrieved_chunks: list[dict],
+    structured_tables: list[StructuredDataTable],
+    structured_rows: list[dict],
 ) -> list[str]:
     thinking_steps = [
         "Visible reasoning trace only: this shows orchestration and evidence used, not the model's hidden chain-of-thought.",
         f"Local selected documents: {', '.join(document.original_filename for document in selected_documents[:6]) or 'none'}",
         f"Shared RAG available: {len(shared_rag_documents)} document(s)",
+        f"Structured tables available: {len(structured_tables)}",
         *steps,
     ]
     if retrieved_chunks:
@@ -317,4 +366,10 @@ def _finalize_thinking_steps(
             )
     else:
         thinking_steps.append("No high-scoring retrieval chunks were attached to this answer.")
+    if structured_rows:
+        thinking_steps.append("Structured rows matched for this answer:")
+        for row in structured_rows[:6]:
+            thinking_steps.append(f"{row['table_name']} (score {row['score']})")
+    else:
+        thinking_steps.append("No structured-data rows were matched for this answer.")
     return thinking_steps

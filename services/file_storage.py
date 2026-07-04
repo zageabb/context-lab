@@ -11,6 +11,7 @@ ENVIRONMENT_SUBDIRECTORIES = (
     "documents",
     "extracted_text",
     "prompts",
+    "structured_data",
 )
 
 
@@ -31,6 +32,16 @@ def save_environment_upload(base_data_dir: Path, environment_id: int, upload: Fi
     extension = Path(original_name).suffix.lower()
     stored_name = f"{uuid.uuid4().hex}{extension}"
     destination = base_dir / "documents" / stored_name
+    upload.save(destination)
+    return original_name, stored_name, destination
+
+
+def save_structured_data_upload(base_data_dir: Path, environment_id: int, upload: FileStorage) -> tuple[str, str, Path]:
+    base_dir = ensure_environment_directories(base_data_dir, environment_id)
+    original_name = secure_filename(upload.filename or "upload")
+    extension = Path(original_name).suffix.lower()
+    stored_name = f"{uuid.uuid4().hex}{extension}"
+    destination = base_dir / "structured_data" / stored_name
     upload.save(destination)
     return original_name, stored_name, destination
 

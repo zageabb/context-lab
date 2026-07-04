@@ -24,6 +24,7 @@ class ContextEnvironment(TimestampMixin, db.Model):
     notes = db.Column(db.Text)
 
     documents = db.relationship("EnvironmentDocument", back_populates="environment", cascade="all, delete-orphan")
+    structured_data_sources = db.relationship("StructuredDataSource", back_populates="environment", cascade="all, delete-orphan")
     prompts = db.relationship("EnvironmentPrompt", back_populates="environment", cascade="all, delete-orphan")
     chat_sessions = db.relationship("ChatSession", back_populates="environment", cascade="all, delete-orphan")
 
@@ -80,6 +81,32 @@ class SharedRAGChunk(db.Model):
     token_estimate = db.Column(db.Integer, nullable=False, default=0)
 
     shared_rag_document = db.relationship("SharedRAGDocument", back_populates="chunks")
+
+
+class StructuredDataSource(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    environment_id = db.Column(db.Integer, db.ForeignKey("context_environment.id"), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)
+    import_notes = db.Column(db.Text)
+    imported_successfully = db.Column(db.Boolean, default=False, nullable=False)
+
+    environment = db.relationship("ContextEnvironment", back_populates="structured_data_sources")
+    tables = db.relationship("StructuredDataTable", back_populates="source", cascade="all, delete-orphan")
+
+
+class StructuredDataTable(TimestampMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    structured_data_source_id = db.Column(db.Integer, db.ForeignKey("structured_data_source.id"), nullable=False)
+    display_name = db.Column(db.String(255), nullable=False)
+    sqlite_table_name = db.Column(db.String(255), nullable=False, unique=True)
+    row_count = db.Column(db.Integer, default=0, nullable=False)
+    column_count = db.Column(db.Integer, default=0, nullable=False)
+    column_names_json = db.Column(db.Text)
+
+    source = db.relationship("StructuredDataSource", back_populates="tables")
 
 
 class EnvironmentPrompt(TimestampMixin, db.Model):

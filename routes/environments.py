@@ -7,14 +7,27 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from werkzeug.utils import secure_filename
 
 from database import db
-from models import ContextEnvironment, EnvironmentDocument, EnvironmentPrompt, SharedRAGDocument
+from models import (
+    ContextEnvironment,
+    EnvironmentDocument,
+    EnvironmentPrompt,
+    SharedRAGDocument,
+    StructuredDataSource,
+    StructuredDataTable,
+)
 from services.document_extraction import extract_text
-from services.file_storage import ensure_environment_directories, environment_dir, save_environment_upload
+from services.file_storage import (
+    ensure_environment_directories,
+    environment_dir,
+    save_environment_upload,
+    save_structured_data_upload,
+)
 from services.markdown_tools import looks_like_markdown, render_markdown_html
 from services.prompt_service import ensure_environment_prompts, save_prompt_content
 from services.rag_service import refresh_document_chunks
 from services.settings_service import get_setting
 from services.shared_rag_service import sync_shared_rag_document
+from services.structured_data_service import delete_structured_tables, import_structured_file_to_sqlite, preview_structured_table
 
 
 environments_bp = Blueprint("environments", __name__, url_prefix="/environments")
@@ -74,6 +87,7 @@ def view_environment(environment_id: int):
         "environments/detail.html",
         environment=environment,
         prompts=sorted(environment.prompts, key=lambda prompt: prompt.title.lower()),
+        structured_sources=sorted(environment.structured_data_sources, key=lambda source: source.updated_at, reverse=True),
         chat_context={"page": "environment-detail", "environment_id": environment.id},
     )
 
@@ -135,6 +149,47 @@ def upload_document(environment_id: int):
         flash(f"Uploaded and processed {original_name}.", "success")
     else:
         flash(f"Uploaded {original_name}, but text extraction failed: {error}", "warning")
+    return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+
+@environments_bp.route("/<int:environment_id>/structured-data/upload", methods=["POST"])
+def upload_structured_data(environment_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Choose a spreadsheet or CSV file to import.", "danger")
+        return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+    extension = Path(upload.filename or "").suffix.lower()
+    if extension not in {".csv", ".xlsx"}:
+        flash("Structured data import currently supports CSV and XLSX files.", "warning")
+        return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+    original_name, stored_name, saved_path = save_structured_data_upload(current_app.config["DATA_DIR"], environment.id, upload)
+    source = StructuredDataSource(
+        environment=environment,
+        original_filename=original_name,
+        stored_filename=stored_name,
+        file_path=str(saved_path),
+        file_type=extension.lstrip("."),
+        imported_successfully=False,
+    )
+    db.session.add(source)
+    db.session.flush()
+    try:
+        imported_tables = import_structured_file_to_sqlite(current_app.config["DATA_DIR"], environment.id, source)
+        for table in imported_tables:
+            db.session.add(table)
+        source.imported_successfully = bool(imported_tables)
+        source.import_notes = (
+            f"Imported {len(imported_tables)} table(s)." if imported_tables else "No populated tables were found in the uploaded file."
+        )
+        db.session.commit()
+        flash(f"Imported structured data from {original_name}.", "success")
+    except Exception as exc:
+        source.import_notes = str(exc)
+        db.session.commit()
+        flash(f"Structured data import failed for {original_name}: {exc}", "warning")
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
 
 
@@ -202,6 +257,24 @@ def delete_document(environment_id: int, document_id: int):
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
 
 
+@environments_bp.route("/<int:environment_id>/structured-data/<int:source_id>/delete", methods=["POST"])
+def delete_structured_data_source(environment_id: int, source_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    source = StructuredDataSource.query.filter_by(environment_id=environment.id, id=source_id).first_or_404()
+    filename = source.original_filename
+    delete_structured_tables(current_app.config["DATA_DIR"], environment.id, list(source.tables))
+    file_path = Path(source.file_path or "")
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except OSError:
+            pass
+    db.session.delete(source)
+    db.session.commit()
+    flash(f"Deleted structured data source: {filename}.", "success")
+    return redirect(url_for("environments.view_environment", environment_id=environment.id))
+
+
 @environments_bp.route("/<int:environment_id>/documents/<int:document_id>/processed")
 def view_processed_document(environment_id: int, document_id: int):
     environment = ContextEnvironment.query.get_or_404(environment_id)
@@ -215,6 +288,25 @@ def view_processed_document(environment_id: int, document_id: int):
         extracted_text_html=render_markdown_html(extracted_text) if is_markdown else None,
         extracted_text_is_markdown=is_markdown,
         chat_context={"page": "environment_document_text", "environment_id": environment.id},
+    )
+
+
+@environments_bp.route("/<int:environment_id>/structured-data/tables/<int:table_id>")
+def view_structured_data_table(environment_id: int, table_id: int):
+    environment = ContextEnvironment.query.get_or_404(environment_id)
+    table = (
+        StructuredDataTable.query.join(StructuredDataSource)
+        .filter(StructuredDataSource.environment_id == environment.id, StructuredDataTable.id == table_id)
+        .first_or_404()
+    )
+    preview = preview_structured_table(current_app.config["DATA_DIR"], environment.id, table)
+    return render_template(
+        "environments/structured_table.html",
+        environment=environment,
+        table=table,
+        preview_columns=preview["columns"],
+        preview_rows=preview["rows"],
+        chat_context={"page": "environment_structured_table", "environment_id": environment.id},
     )
 
 

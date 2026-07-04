@@ -115,6 +115,60 @@
   <section class="glass-panel p-4 mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <div>
+        <h2 class="h4 mb-1">Structured Data</h2>
+        <p class="text-muted mb-0">Import CSV or XLSX files into an environment-local SQLite store so the chat can use tabular data as structured context.</p>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('environments.upload_structured_data', environment_id=environment.id) }}" enctype="multipart/form-data" class="upload-bar mb-4">
+      <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required>
+      <button class="btn btn-primary" type="submit">Import Structured Data</button>
+    </form>
+
+    {% if structured_sources %}
+      <div class="document-list">
+        {% for source in structured_sources %}
+          <div class="document-card">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">{{ source.original_filename }}</div>
+                <div class="small text-muted mt-1">{{ source.import_notes or "No import notes." }}</div>
+              </div>
+              <span class="badge {% if source.imported_successfully %}text-bg-success{% else %}text-bg-warning{% endif %}">
+                {{ "Imported" if source.imported_successfully else "Needs Review" }}
+              </span>
+            </div>
+            {% if source.tables %}
+              <div class="structured-table-list mt-3">
+                {% for table in source.tables %}
+                  <div class="structured-table-item">
+                    <div>
+                      <div class="fw-semibold">{{ table.display_name }}</div>
+                      <div class="small text-muted">{{ table.row_count }} rows, {{ table.column_count }} columns</div>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('environments.view_structured_data_table', environment_id=environment.id, table_id=table.id) }}">Preview Table</a>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="action-row mt-3">
+              <form method="post" action="{{ url_for('environments.delete_structured_data_source', environment_id=environment.id, source_id=source.id) }}" onsubmit="return window.confirm('Delete this structured data source and all imported tables?');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete Structured Data</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h3 class="h5">No structured data yet</h3>
+        <p class="text-muted mb-0">Import a spreadsheet or CSV to make tabular data available to the environment-local SQLite store and chat context.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="glass-panel p-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
         <h2 class="h4 mb-1">Environment Details</h2>
         <p class="text-muted mb-0">Edit the saved metadata and per-environment instruction files after the document setup is in place.</p>
       </div>

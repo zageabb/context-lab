@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Structured Table | Context Lab{% endblock %}
+{% block content %}
+  <section class="hero-card mb-4">
+    <div>
+      <span class="eyebrow">Structured Data</span>
+      <h1 class="display-title">{{ table.display_name }}</h1>
+      <p class="hero-copy">Preview imported rows from the environment-local SQLite-backed structured data store.</p>
+    </div>
+    <div class="hero-metric">
+      <span class="hero-metric-label">Rows</span>
+      <strong class="fs-2">{{ table.row_count }}</strong>
+      <div class="small text-white-50 mt-1">{{ table.column_count }} columns</div>
+    </div>
+  </section>
+
+  <div class="glass-panel p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="h4 mb-1">Table Preview</h2>
+        <p class="text-muted mb-0">Showing the first imported rows from this table.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('environments.view_environment', environment_id=environment.id) }}">Back to Environment</a>
+    </div>
+
+    {% if preview_columns %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle structured-table-preview">
+          <thead>
+            <tr>
+              {% for column in preview_columns %}
+                <th>{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in preview_rows %}
+              <tr>
+                {% for value in row %}
+                  <td>{{ value }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <h3 class="h5">No preview available</h3>
+        <p class="text-muted mb-0">This structured table does not currently have any imported columns or rows.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
