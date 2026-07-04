@@ -32,6 +32,13 @@ BASE_CHAT_GROUNDING_INSTRUCTIONS = (
     "- Be explicit about which evidence source supports the answer.\n"
     "- Do not invent facts or claim certainty beyond the provided context.\n"
 )
+REQUIRED_PROMPT_SECTIONS = (
+    ("selected_documents_context", "Selected document summaries"),
+    ("shared_rag_context", "Shared RAG library summary"),
+    ("structured_data_context", "Structured data summary"),
+    ("structured_row_context", "Structured data rows matched for this question"),
+    ("retrieved_context", "Retrieved RAG chunks"),
+)
 
 
 def get_or_create_session(db, environment_id: int | None, page_context: dict | None) -> ChatSession:
@@ -212,18 +219,20 @@ def build_chat_response(
     rag_context = format_retrieved_context(retrieved_chunks)
     structured_row_context = format_structured_row_context(structured_rows)
     system_prompt = f"{BASE_CHAT_GROUNDING_INSTRUCTIONS}\n{get_prompt_content(environment, 'chat_system').strip()}"
-    answer_prompt = render_template_text(
-        get_prompt_content(environment, "chat_answer"),
-        system_prompt=system_prompt,
-        environment_context=_serialize_environment_context(environment),
-        page_context=_serialize_page_context(page_context),
-        selected_documents_context=selected_context,
-        shared_rag_context=shared_rag_context,
-        structured_data_context=structured_data_context,
-        structured_row_context=structured_row_context,
-        retrieved_context=rag_context,
-        user_message=message,
-    )
+    prompt_values = {
+        "system_prompt": system_prompt,
+        "environment_context": _serialize_environment_context(environment),
+        "page_context": _serialize_page_context(page_context),
+        "selected_documents_context": selected_context,
+        "shared_rag_context": shared_rag_context,
+        "structured_data_context": structured_data_context,
+        "structured_row_context": structured_row_context,
+        "retrieved_context": rag_context,
+        "user_message": message,
+    }
+    answer_template = get_prompt_content(environment, "chat_answer")
+    answer_prompt = render_template_text(answer_template, **prompt_values)
+    answer_prompt = _append_missing_prompt_sections(answer_prompt, answer_template, prompt_values)
     answer = answer_client.generate_text(answer_model_name, answer_prompt)
     response_payload = {
         "response_type": "answer",
@@ -383,3 +392,17 @@ def _finalize_thinking_steps(
     else:
         thinking_steps.append("No structured-data rows were matched for this answer.")
     return thinking_steps
+
+
+def _append_missing_prompt_sections(prompt: str, template: str, prompt_values: dict[str, str]) -> str:
+    sections_to_add: list[str] = []
+    for key, label in REQUIRED_PROMPT_SECTIONS:
+        if f"{{{{{key}}}}}" in template:
+            continue
+        value = (prompt_values.get(key) or "").strip()
+        if not value:
+            continue
+        sections_to_add.append(f"{label}:\n{value}")
+    if not sections_to_add:
+        return prompt
+    return prompt.rstrip() + "\n\nSupplemental context added automatically because this environment template omitted some evidence sections:\n\n" + "\n\n".join(sections_to_add) + "\n"
