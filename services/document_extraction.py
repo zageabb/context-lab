@@ -105,7 +105,7 @@ def extract_text(file_path: str | Path) -> tuple[str, str | None]:
     path = Path(file_path)
     suffix = path.suffix.lower()
     try:
-        if suffix == ".txt":
+        if suffix in {".txt", ".md"}:
             return path.read_text(encoding="utf-8", errors="ignore"), None
         if suffix == ".csv":
             return _csv_to_markdown(path), None
