@@ -101,60 +101,70 @@ def view_environment(environment_id: int):
 @environments_bp.route("/<int:environment_id>/upload", methods=["POST"])
 def upload_document(environment_id: int):
     environment = ContextEnvironment.query.get_or_404(environment_id)
-    upload = request.files.get("file")
-    if upload is None or not upload.filename:
-        flash("Choose a file to upload.", "danger")
+    uploads = request.files.getlist("documents")
+    if not uploads or not uploads[0].filename:
+        flash("Select at least one file to upload.", "warning")
         return redirect(url_for("environments.view_environment", environment_id=environment.id))
-
-    original_name = secure_filename(upload.filename or "upload")
-    existing = EnvironmentDocument.query.filter_by(
-        environment_id=environment.id,
-        original_filename=original_name,
-    ).first()
-    original_name, stored_name, saved_path = save_environment_upload(current_app.config["DATA_DIR"], environment.id, upload)
-    text, error = extract_text(saved_path)
-    extracted_text_path = None
-    if text:
-        base_dir = ensure_environment_directories(current_app.config["DATA_DIR"], environment.id)
-        extracted_text_path = base_dir / "extracted_text" / f"{Path(stored_name).stem}.md"
-        extracted_text_path.write_text(text, encoding="utf-8")
-
-    if existing is None:
-        document = EnvironmentDocument(
-            environment=environment,
-            original_filename=original_name,
-            stored_filename=stored_name,
-            file_path=str(saved_path),
-            file_type=Path(original_name).suffix.lower().lstrip("."),
-            extracted_text=text or None,
-            extracted_text_path=str(extracted_text_path) if extracted_text_path else None,
-            processed=bool(text),
-            processing_notes=error or "Processed during upload.",
-        )
-        db.session.add(document)
-    else:
-        existing.stored_filename = stored_name
-        existing.file_path = str(saved_path)
-        existing.file_type = Path(original_name).suffix.lower().lstrip(".")
-        existing.extracted_text = text or None
-        existing.extracted_text_path = str(extracted_text_path) if extracted_text_path else None
-        existing.processed = bool(text)
-        existing.processing_notes = error or "Reprocessed during upload."
-        existing.chunks.clear()
-        existing.rag_ready = False
-        document = existing
 
     chunk_size = int(get_setting("retrieval_chunk_size", "1400") or "1400")
     chunk_overlap = int(get_setting("retrieval_chunk_overlap", "250") or "250")
-    if text:
-        chunk_count = refresh_document_chunks(document, chunk_size=chunk_size, overlap=chunk_overlap)
-        document.rag_ready = chunk_count > 0
-    sync_shared_rag_document(document, chunk_size=chunk_size, overlap=chunk_overlap)
+    success_count = 0
+    warning_count = 0
+    for upload in uploads:
+        if upload is None or not upload.filename:
+            continue
+        original_name = secure_filename(upload.filename or "upload")
+        existing = EnvironmentDocument.query.filter_by(
+            environment_id=environment.id,
+            original_filename=original_name,
+        ).first()
+        original_name, stored_name, saved_path = save_environment_upload(current_app.config["DATA_DIR"], environment.id, upload)
+        text, error = extract_text(saved_path)
+        extracted_text_path = None
+        if text:
+            base_dir = ensure_environment_directories(current_app.config["DATA_DIR"], environment.id)
+            extracted_text_path = base_dir / "extracted_text" / f"{Path(stored_name).stem}.md"
+            extracted_text_path.write_text(text, encoding="utf-8")
+
+        if existing is None:
+            document = EnvironmentDocument(
+                environment=environment,
+                original_filename=original_name,
+                stored_filename=stored_name,
+                file_path=str(saved_path),
+                file_type=Path(original_name).suffix.lower().lstrip("."),
+                extracted_text=text or None,
+                extracted_text_path=str(extracted_text_path) if extracted_text_path else None,
+                processed=bool(text),
+                processing_notes=error or "Processed during upload.",
+            )
+            db.session.add(document)
+        else:
+            existing.stored_filename = stored_name
+            existing.file_path = str(saved_path)
+            existing.file_type = Path(original_name).suffix.lower().lstrip(".")
+            existing.extracted_text = text or None
+            existing.extracted_text_path = str(extracted_text_path) if extracted_text_path else None
+            existing.processed = bool(text)
+            existing.processing_notes = error or "Reprocessed during upload."
+            existing.chunks.clear()
+            existing.rag_ready = False
+            document = existing
+
+        if text:
+            chunk_count = refresh_document_chunks(document, chunk_size=chunk_size, overlap=chunk_overlap)
+            document.rag_ready = chunk_count > 0
+            success_count += 1
+        else:
+            warning_count += 1
+        sync_shared_rag_document(document, chunk_size=chunk_size, overlap=chunk_overlap)
+
     db.session.commit()
-    if text:
-        flash(f"Uploaded and processed {original_name}.", "success")
-    else:
-        flash(f"Uploaded {original_name}, but text extraction failed: {error}", "warning")
+    total_count = success_count + warning_count
+    if success_count:
+        flash(f"Upload complete. {success_count} of {total_count} file(s) were processed successfully.", "success")
+    if warning_count:
+        flash(f"{warning_count} file(s) were uploaded but could not be fully processed for text extraction.", "warning")
     return redirect(url_for("environments.view_environment", environment_id=environment.id))
 
 
