@@ -1,5 +1,31 @@
 # Context Lab
 
+## Ubuntu server deployment
+
+Verified on **14 September 2026** against the listeners, user systemd services,
+Docker port mappings and deployment registry on `192.168.1.249`.
+
+| Endpoint | Host TCP port | LAN URL |
+|---|---:|---|
+| Application | 5051 | http://192.168.1.249:5051/ |
+
+Checkout: `/home/zageabb/ollama-chat/context-lab`.
+
+These are **user** systemd units. Inspect them with:
+
+```bash
+systemctl --user status ollama-chat-context-lab.service
+systemctl --user cat ollama-chat-context-lab.service
+```
+
+Local verification URL: `http://127.0.0.1:5051/`. HTTP 200 was observed during this audit.
+
+Development defaults and container-internal ports elsewhere in this repository
+may differ from this host deployment. Use the live ports above when accessing
+this Ubuntu server; do not start a second copy on a port already occupied.
+
+[Complete Ubuntu port inventory](https://github.com/zageabb/universal-deployment-agent/blob/main/UBUNTU_PORTS.md).
+
 Context Lab is a simplified Flask app extracted from the local Tender Designer work and reshaped for one job:
 testing how different document context and prompt instructions affect LLM chat answers.
 
