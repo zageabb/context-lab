@@ -1,3 +1,4 @@
+const contextLabUrl = path => new URL(path.replace(/^\/+/, ''), document.baseURI).toString();
 const chatContext = JSON.parse(document.body.dataset.chatContext || "{}");
 const chatHistory = document.getElementById("chat-history");
 const chatForm = document.getElementById("chat-form");
@@ -155,7 +156,7 @@ function renderMarkdown(text) {
 
 async function loadHistory() {
   if (!chatHistory || historyLoaded) return;
-  const response = await fetch("/chat/history", {
+  const response = await fetch(contextLabUrl("/chat/history"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ context: buildChatContext() }),
@@ -174,7 +175,7 @@ if (clearButton) {
   clearButton.addEventListener("click", async () => {
     const confirmed = window.confirm("Clear this saved chat history for the current context?");
     if (!confirmed) return;
-    const response = await fetch("/chat/clear", {
+    const response = await fetch(contextLabUrl("/chat/clear"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ context: buildChatContext() }),
@@ -201,7 +202,7 @@ if (chatForm) {
       submitButton.dataset.originalText = submitButton.textContent;
       submitButton.textContent = "Working...";
     }
-    const response = await fetch("/chat/message", {
+    const response = await fetch(contextLabUrl("/chat/message"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, context: buildChatContext() }),
@@ -222,7 +223,7 @@ if (uploadForm) {
     const formData = new FormData();
     formData.append("file", input.files[0]);
     formData.append("context", JSON.stringify(buildChatContext()));
-    const response = await fetch("/chat/upload", { method: "POST", body: formData });
+    const response = await fetch(contextLabUrl("/chat/upload"), { method: "POST", body: formData });
     const payload = await response.json();
     appendMessage("assistant", payload.message || "Upload finished.");
     input.value = "";
