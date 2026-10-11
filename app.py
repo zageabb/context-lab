@@ -18,7 +18,7 @@ from services.settings_service import ensure_default_settings
 def create_app() -> Flask:
     app = Flask(__name__)
     # Only trust UDA's controlled reverse-proxy hop; restrict backend ingress.
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=0, x_proto=1, x_host=1, x_prefix=1)
     app.config.from_object(Config)
     app.config["DATA_DIR"].mkdir(parents=True, exist_ok=True)
     (app.config["DATA_DIR"] / "environments").mkdir(parents=True, exist_ok=True)
